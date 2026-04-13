@@ -6,8 +6,8 @@ class Settings(BaseSettings):
     # Ollama
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "llama3.2:1b"
-    # Context window size — 3072 gives enough room for prompt + context + generation
-    OLLAMA_NUM_CTX: int = 3072
+    # Context window — 2048 is enough for prompt + context + generation and is faster
+    OLLAMA_NUM_CTX: int = 2048
 
     # ChromaDB
     CHROMA_PERSIST_DIR: str = "./chroma_db"
@@ -25,10 +25,10 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
 
     # RAG settings
-    # Number of document chunks to retrieve per query
-    RETRIEVAL_TOP_K: int = 3
+    # Fewer chunks = less prefill tokens = faster generation
+    RETRIEVAL_TOP_K: int = 2
     CHUNK_SIZE: int = 400
-    CHUNK_OVERLAP: int = 80
+    CHUNK_OVERLAP: int = 60
 
     model_config = {"env_file": ".env"}
 

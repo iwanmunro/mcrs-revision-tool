@@ -3,6 +3,10 @@ services:
   ollama:
     image: ollama/ollama:latest
     container_name: mrcs_ollama
+    environment:
+      OLLAMA_NUM_THREAD: '4'          # use all vCPUs
+      OLLAMA_FLASH_ATTENTION: '1'     # faster attention
+      OLLAMA_MAX_LOADED_MODELS: '2'   # keep both models warm
     volumes:
       - ollama_data:/root/.ollama
     # Port not exposed publicly — backend accesses via internal Docker network
