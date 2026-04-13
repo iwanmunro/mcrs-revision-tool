@@ -5,7 +5,7 @@ from functools import lru_cache
 class Settings(BaseSettings):
     # Ollama
     OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL: str = "llama3.2:1b"
+    OLLAMA_MODEL: str = "llama3.1:8b"
     # Context window — 2048 is enough for prompt + context + generation and is faster
     OLLAMA_NUM_CTX: int = 2048
 

@@ -91,9 +91,9 @@ def get_llm() -> ChatOllama:
 
 
 def get_practice_llm() -> ChatOllama:
-    """Larger model for practice question generation — better instruction following."""
+    """Model for practice question generation."""
     return ChatOllama(
-        model="llama3.2:latest",
+        model="llama3.1:8b",
         base_url=settings.OLLAMA_BASE_URL,
         temperature=0.5,
         num_ctx=settings.OLLAMA_NUM_CTX,
