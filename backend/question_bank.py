@@ -63,6 +63,19 @@ def random_question() -> Optional[dict]:
     return dict(row) if row else None
 
 
+def random_questions(n: int) -> list[dict]:
+    """Return up to *n* distinct random questions (capped at 50)."""
+    n = max(1, min(n, 50))
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM questions WHERE option_a IS NOT NULL AND option_e IS NOT NULL "
+        "ORDER BY RANDOM() LIMIT ?",
+        (n,),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
 def clear_source(source: str) -> int:
     conn = get_db()
     cur = conn.execute("DELETE FROM questions WHERE source = ?", (source,))

@@ -307,6 +307,18 @@ export async function fetchBankQuestion(): Promise<string> {
   return data.question_text as string
 }
 
+export async function fetchBankQuestions(count: number): Promise<string[]> {
+  const res = await apiFetch(`${BASE_URL}/questions/bank/batch?count=${count}`, {
+    headers: authHeaders(),
+  })
+  if (!res.ok) {
+    if (res.status === 404) throw new Error('No questions in bank')
+    throw new Error('Failed to fetch questions')
+  }
+  const data = await res.json()
+  return (data.questions as { question_text: string }[]).map(q => q.question_text)
+}
+
 export async function fetchBankCount(): Promise<number> {
   const res = await apiFetch(`${BASE_URL}/questions/bank/count`, {
     headers: authHeaders(),

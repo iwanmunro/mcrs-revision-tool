@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, FormEvent } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { RefreshCw, ChevronDown, ChevronUp, Loader2, BookOpen, Send, MessageSquare } from 'lucide-react'
-import { streamPracticeQuestion, streamFollowUp, fetchCollections, fetchBankQuestion } from '../services/api'
+import { streamPracticeQuestion, generatePracticeQuestion, streamFollowUp, fetchCollections, fetchBankQuestions } from '../services/api'
 import type { Collection } from '../types'
 
 let fuCounter = 0
@@ -181,9 +181,16 @@ export default function PracticeMode() {
   const [followUpMessages, setFollowUpMessages] = useState<FollowUpMsg[]>([])
   const [followUpInput, setFollowUpInput]   = useState('')
   const [followUpLoading, setFollowUpLoading] = useState(false)
-  const questionRef      = useRef<HTMLDivElement>(null)
-  const followUpBottom   = useRef<HTMLDivElement>(null)
-  const fullStreamRef    = useRef('')   // accumulates every token; not bounded by the cut point
+  // Queue state
+  const [queueCount, setQueueCount]         = useState(5)
+  const [preloadedQueue, setPreloadedQueue] = useState<string[]>([])
+  const [preloadingCount, setPreloadingCount] = useState(0)
+  const [questionIndex, setQuestionIndex]   = useState(1)
+  const [setTotal, setSetTotal]             = useState(1)
+  const questionRef    = useRef<HTMLDivElement>(null)
+  const followUpBottom = useRef<HTMLDivElement>(null)
+  const fullStreamRef  = useRef('')   // accumulates every token; not bounded by the cut point
+  const wantingNext    = useRef(false) // set true when user clicks Next but queue is empty
 
   useEffect(() => {
     fetchCollections()
@@ -198,6 +205,15 @@ export default function PracticeMode() {
     followUpBottom.current?.scrollIntoView({ behavior: 'smooth' })
   }, [followUpMessages])
 
+  // Auto-advance when user clicked Next before the next question was ready
+  useEffect(() => {
+    if (wantingNext.current && preloadedQueue.length > 0) {
+      wantingNext.current = false
+      setLoading(false)
+      advanceToNextQueued()
+    }
+  }, [preloadedQueue]) // eslint-disable-line react-hooks/exhaustive-deps
+
   function toggleCollection(name: string) {
     setSelectedCollections(prev =>
       prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]
@@ -207,6 +223,35 @@ export default function PracticeMode() {
   const activeCols = selectedCollections.length > 0
     ? selectedCollections
     : collections.map(c => c.name)
+
+  function advanceToNextQueued() {
+    setPreloadedQueue(prev => {
+      const [next, ...rest] = prev
+      setQuestion(next)
+      setShowAnswer(false)
+      setFollowUpMessages([])
+      setQuestionIndex(i => i + 1)
+      setTimeout(() => questionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
+      return rest
+    })
+  }
+
+  function handleNext() {
+    if (preloadedQueue.length > 0) {
+      advanceToNextQueued()
+    } else if (preloadingCount > 0) {
+      // Queue not ready yet — wait for the useEffect to fire
+      wantingNext.current = true
+      setLoading(true)
+    }
+  }
+
+  function resetQueueState() {
+    setPreloadedQueue([])
+    setPreloadingCount(0)
+    setQuestionIndex(1)
+    setSetTotal(queueCount)
+  }
 
   async function handleGenerate() {
     const effectiveTopic = customTopic.trim() || topic || 'any topic covered in the knowledge base'
@@ -218,6 +263,7 @@ export default function PracticeMode() {
     setFollowUpMessages([])
     setShowControls(false)
     fullStreamRef.current = ''
+    resetQueueState()
 
     await streamPracticeQuestion(
       effectiveTopic,
@@ -238,6 +284,19 @@ export default function PracticeMode() {
           setQuestion(final)
           setStreamingText('')
           setTimeout(() => questionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
+          // Pre-generate remaining questions silently in the background
+          const remaining = queueCount - 1
+          if (remaining > 0) {
+            setPreloadingCount(remaining)
+            for (let i = 0; i < remaining; i++) {
+              generatePracticeQuestion(effectiveTopic, activeCols)
+                .then(q => {
+                  setPreloadedQueue(prev => [...prev, q])
+                  setPreloadingCount(prev => Math.max(0, prev - 1))
+                })
+                .catch(() => setPreloadingCount(prev => Math.max(0, prev - 1)))
+            }
+          }
         }
         setLoading(false)
       },
@@ -258,9 +317,11 @@ export default function PracticeMode() {
     setFollowUpMessages([])
     setShowControls(false)
     fullStreamRef.current = ''
+    resetQueueState()
     try {
-      const text = await fetchBankQuestion()
-      setQuestion(text)
+      const texts = await fetchBankQuestions(queueCount)
+      setQuestion(texts[0])
+      setPreloadedQueue(texts.slice(1))
       setTimeout(() => questionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
     } catch (e: unknown) {
       setError((e instanceof Error ? e.message : null) || 'Failed to load question')
@@ -319,6 +380,10 @@ export default function PracticeMode() {
     setError('')
     setFollowUpMessages([])
     setShowAnswer(false)
+    setPreloadedQueue([])
+    setPreloadingCount(0)
+    setQuestionIndex(1)
+    setSetTotal(1)
   }
 
   return (
@@ -353,6 +418,21 @@ export default function PracticeMode() {
           <p className="text-sm text-gray-500">
             Draw a random SBA question from the parsed question bank.
           </p>
+
+          {/* Questions per set */}
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-medium text-gray-700">Questions per set</label>
+            <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
+              <button type="button" onClick={() => setQueueCount(v => Math.max(1, v - 1))}
+                className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 transition-colors text-lg leading-none"
+              >−</button>
+              <span className="px-3 py-1.5 text-sm font-semibold text-gray-900 min-w-[2rem] text-center">{queueCount}</span>
+              <button type="button" onClick={() => setQueueCount(v => Math.min(10, v + 1))}
+                className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 transition-colors text-lg leading-none"
+              >+</button>
+            </div>
+            <span className="text-xs text-gray-400">Questions are drawn instantly</span>
+          </div>
           <button
             onClick={handleBankQuestion}
             disabled={loading}
@@ -369,6 +449,21 @@ export default function PracticeMode() {
             <BookOpen className="w-5 h-5 text-brand-600" />
             Generate a Practice Question
           </h2>
+
+          {/* Questions per set */}
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-medium text-gray-700">Questions per set</label>
+            <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
+              <button type="button" onClick={() => setQueueCount(v => Math.max(1, v - 1))}
+                className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 transition-colors text-lg leading-none"
+              >−</button>
+              <span className="px-3 py-1.5 text-sm font-semibold text-gray-900 min-w-[2rem] text-center">{queueCount}</span>
+              <button type="button" onClick={() => setQueueCount(v => Math.min(10, v + 1))}
+                className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 transition-colors text-lg leading-none"
+              >+</button>
+            </div>
+            <span className="text-xs text-gray-400">Rest generate silently in background</span>
+          </div>
 
           {/* Collection toggle pills */}
           {collections.length > 0 && (
@@ -466,8 +561,20 @@ export default function PracticeMode() {
                        text-white font-medium rounded-lg px-4 py-2 transition-colors text-sm"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-            {loading ? (questionMode === 'bank' ? 'Loading…' : 'Generating…') : 'New Question'}
+            {loading ? (questionMode === 'bank' ? 'Loading…' : 'Generating…') : 'New Set'}
           </button>
+          {(preloadedQueue.length > 0 || preloadingCount > 0) && (
+            <button
+              onClick={handleNext}
+              disabled={loading}
+              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300
+                         text-white font-medium rounded-lg px-4 py-2 transition-colors text-sm"
+            >
+              {preloadedQueue.length > 0
+                ? `Next → (${preloadedQueue.length} ready)`
+                : `Next → (generating…)`}
+            </button>
+          )}
           {questionMode === 'generated' && (
             <button
               onClick={() => setShowControls(true)}
@@ -504,7 +611,28 @@ export default function PracticeMode() {
 
       {/* ── Final question card ── */}
       {question && !loading && (
-        <div ref={questionRef} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <>
+          {/* Progress badge */}
+          {setTotal > 1 && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-500">
+                Question {questionIndex} of {setTotal}
+              </span>
+              {preloadingCount > 0 && (
+                <span className="flex items-center gap-1.5 text-xs text-gray-400">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Generating {preloadingCount} more…
+                </span>
+              )}
+              {preloadedQueue.length > 0 && preloadingCount === 0 && (
+                <span className="text-xs text-emerald-600 font-medium">
+                  {preloadedQueue.length} ready
+                </span>
+              )}
+            </div>
+          )}
+
+          <div ref={questionRef} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
 
           {/* Question + Options */}
           <div className="p-5 prose prose-sm max-w-none text-gray-900">
@@ -592,6 +720,20 @@ export default function PracticeMode() {
             </div>
           )}
         </div>
+
+          {/* Next button — shown below the card when more questions are queued */}
+          {(preloadedQueue.length > 0 || preloadingCount > 0) && (
+            <button
+              onClick={handleNext}
+              className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700
+                         text-white font-medium rounded-xl px-5 py-3 transition-colors text-sm"
+            >
+              {preloadedQueue.length > 0
+                ? <>Next question → <span className="opacity-75 text-xs">({preloadedQueue.length} ready)</span></>
+                : <><Loader2 className="w-4 h-4 animate-spin" /> Waiting for next question…</>}
+            </button>
+          )}
+        </>
       )}
     </div>
   )

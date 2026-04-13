@@ -33,6 +33,7 @@ from question_bank import (
     parse_and_store,
     question_count,
     random_question,
+    random_questions,
 )
 from rag import (
     answer_question,
@@ -340,6 +341,20 @@ def bank_random(_: str = Depends(require_auth)):
     if row is None:
         raise HTTPException(status_code=404, detail="No questions in bank. Upload and parse the question bank file first.")
     return {"question_text": format_as_markdown(row), "id": row["id"]}
+
+
+@app.get("/questions/bank/batch")
+def bank_batch(count: int = 5, _: str = Depends(require_auth)):
+    """Return up to *count* distinct random questions from the bank."""
+    rows = random_questions(count)
+    if not rows:
+        raise HTTPException(status_code=404, detail="No questions in bank.")
+    return {
+        "questions": [
+            {"question_text": format_as_markdown(r), "id": r["id"]}
+            for r in rows
+        ]
+    }
 
 
 # ---------------------------------------------------------------------------
