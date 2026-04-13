@@ -24,17 +24,19 @@ sudo usermod -aG docker "$USER"
 echo "==> Docker installed"
 
 echo "==> Configuring firewall"
+# Oracle Ubuntu images block ports via iptables underneath UFW
+sudo apt-get install -y iptables-persistent
+sudo iptables -I INPUT -p tcp --dport 80 -j ACCEPT
+sudo iptables -I INPUT -p tcp --dport 443 -j ACCEPT
+sudo iptables -I INPUT -p tcp --dport 22 -j ACCEPT
+sudo netfilter-persistent save
 if command -v ufw &>/dev/null; then
   sudo ufw allow 80/tcp
-  sudo ufw allow 22/tcp
-  sudo ufw --force enable
-else
-  sudo apt-get install -y ufw
-  sudo ufw allow 80/tcp
+  sudo ufw allow 443/tcp
   sudo ufw allow 22/tcp
   sudo ufw --force enable
 fi
-echo "NOTE: Also add an Ingress Rule for TCP port 80 in your Oracle Cloud Security List"
+echo "NOTE: Also add Ingress Rules for TCP ports 80 and 443 in your Oracle Cloud Security List"
 
 echo "==> Cloning repository"
 git clone https://github.com/iwanmunro/mcrs-revision-tool.git app
