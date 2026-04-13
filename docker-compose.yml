@@ -5,8 +5,7 @@ services:
     container_name: mrcs_ollama
     volumes:
       - ollama_data:/root/.ollama
-    ports:
-      - '11434:11434'
+    # Port not exposed publicly — backend accesses via internal Docker network
     restart: unless-stopped
 
   # ── FastAPI backend ──────────────────────────────────────────────────────────
@@ -37,7 +36,7 @@ services:
       dockerfile: Dockerfile
     container_name: mrcs_frontend
     ports:
-      - '${APP_PORT:-3000}:80'
+      - '${APP_PORT:-80}:80'
     depends_on:
       - backend
     restart: unless-stopped
