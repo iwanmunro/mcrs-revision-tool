@@ -51,7 +51,15 @@ app = FastAPI(
 # Allow the React dev server and same-origin production builds
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000", "http://localhost:80"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://localhost:80",
+        "http://mrcs-revision.online",
+        "https://mrcs-revision.online",
+        "http://www.mrcs-revision.online",
+        "https://www.mrcs-revision.online",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
