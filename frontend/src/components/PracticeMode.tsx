@@ -1,0 +1,528 @@
+import { useState, useEffect, useRef, FormEvent } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import { RefreshCw, ChevronDown, ChevronUp, Loader2, BookOpen, Send, MessageSquare } from 'lucide-react'
+import { streamPracticeQuestion, streamFollowUp, fetchCollections } from '../services/api'
+import type { Collection } from '../types'
+
+let fuCounter = 0
+const genFuId = () => `fu-${++fuCounter}`
+
+interface FollowUpMsg {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+}
+
+const TOPIC_GROUPS: { label: string; topics: string[] }[] = [
+  {
+    label: 'Paper 1 – Anatomy (Regional)',
+    topics: [
+      'Thoracic anatomy',
+      'Abdominal anatomy and retroperitoneum',
+      'Pelvic anatomy',
+      'Perineal anatomy and anal canal',
+      'Upper limb anatomy and brachial plexus',
+      'Lower limb anatomy and femoral triangle',
+      'Spinal anatomy and vertebral levels',
+      'Head and neck anatomy',
+      'Brain and cerebral circulation',
+      'Autonomic nervous system',
+    ],
+  },
+  {
+    label: 'Paper 1 – Anatomy (Embryology & Imaging)',
+    topics: [
+      'Surgical embryology – thorax',
+      'Surgical embryology – head and neck (branchial arches)',
+      'Surgical embryology – gut and perineum',
+      'Surface and imaging anatomy',
+      'CT cross-sectional anatomy',
+    ],
+  },
+  {
+    label: 'Paper 1 – Physiology (General)',
+    topics: [
+      'Fluid compartments and Starling forces',
+      'Acid-base balance and blood gas interpretation',
+      'Coagulation cascade and haemostasis',
+      'Metabolic response to surgery',
+      'Electrolyte disturbances',
+      'Oxygen delivery and consumption',
+      'Thermoregulation',
+    ],
+  },
+  {
+    label: 'Paper 1 – Physiology (Organ Systems)',
+    topics: [
+      'Cardiovascular physiology and cardiac cycle',
+      'Respiratory physiology and lung volumes',
+      'Gastrointestinal physiology and secretion',
+      'Renal physiology and RAAS',
+      'Endocrine physiology and stress response',
+      'Neurological physiology and pain pathways',
+    ],
+  },
+  {
+    label: 'Paper 1 – Pathology',
+    topics: [
+      'Acute and chronic inflammation',
+      'Wound healing and repair',
+      'Thrombosis and embolism',
+      'Surgical immunology and hypersensitivity',
+      'Surgical haematology and coagulopathies',
+      'Principles of neoplasia and oncology',
+      'Breast pathology',
+      'Skin cancer – BCC, SCC, melanoma',
+      'Colorectal cancer and polyps',
+      'Thyroid and endocrine gland pathology',
+      'Musculoskeletal and bone tumours',
+      'Lymphoreticular pathology',
+    ],
+  },
+  {
+    label: 'Paper 1 – Pharmacology, Microbiology & Imaging',
+    topics: [
+      'Analgesics and opioid pharmacology',
+      'Antibiotic classes and surgical prophylaxis',
+      'Anaesthetic agents and NMBAs',
+      'Local anaesthetics – mechanism and toxicity',
+      'Anticoagulants and antiplatelet agents',
+      'Common surgical pathogens and SSI',
+      'Sepsis, necrotising fasciitis and C. difficile',
+      'Imaging interpretation – CXR and AXR',
+      'CT imaging phases and contrast',
+      'Evidence-based surgery and statistics',
+    ],
+  },
+  {
+    label: 'Paper 2 – Common Surgical Conditions',
+    topics: [
+      'Colorectal cancer and IBD',
+      'Appendicitis and biliary disease',
+      'Pancreatitis',
+      'Hernia types and management',
+      'Breast disease and breast cancer management',
+      'Peripheral arterial disease and acute limb ischaemia',
+      'Aortic aneurysm',
+      'Carotid artery disease and varicose veins',
+      'DVT and pulmonary embolism',
+      'Renal calculi and urological disease',
+      'Prostate and bladder cancer',
+      'Thyroid disease and nodule assessment',
+      'Parathyroid and adrenal disease',
+      'MEN syndromes and carcinoid',
+      'Hip fractures and orthopaedic conditions',
+      'Compartment syndrome and osteomyelitis',
+      'Septic arthritis and bone tumours',
+      'Head and neck cancer',
+      'Neurosurgery – head injury and brain tumours',
+    ],
+  },
+  {
+    label: 'Paper 2 – Perioperative Management',
+    topics: [
+      'Preoperative assessment and ASA classification',
+      'DVT/PE prophylaxis and VTE risk',
+      'Intraoperative care and diathermy',
+      'Enhanced recovery after surgery (ERAS)',
+      'Postoperative complications',
+      'Anastomotic leak and surgical site infection',
+      'Nutritional management and refeeding syndrome',
+      'Blood products and massive transfusion',
+      'Perioperative management of diabetes',
+      'Perioperative management of anticoagulation',
+      'Metabolic and electrolyte disorders perioperatively',
+    ],
+  },
+  {
+    label: 'Paper 2 – Trauma',
+    topics: [
+      'ATLS primary and secondary survey',
+      'Haemorrhagic shock classification',
+      'Burns management (Rule of Nines, Parkland formula)',
+      'Fractures – classification and open fractures (Gustilo)',
+      'Hip and lower limb fractures',
+      'Upper limb fractures (scaphoid, distal radius, supracondylar)',
+      'Head trauma and intracranial haemorrhage',
+      'Chest trauma – tension pneumothorax and haemothorax',
+      'Abdominal trauma and FAST scan',
+      'Pelvic trauma',
+      'Soft tissue and vascular trauma',
+    ],
+  },
+  {
+    label: 'Paper 2 – Paediatric Surgery & Medico-legal',
+    topics: [
+      'Neonatal surgical emergencies',
+      'Paediatric trauma and non-accidental injury',
+      'Pyloric stenosis',
+      'Paediatric hernias and undescended testis',
+      'Consent and the Montgomery ruling',
+      'Mental Capacity Act and best interests',
+      'Confidentiality and Caldicott principles',
+      'Clinical negligence and duty of candour',
+    ],
+  },
+]
+
+export default function PracticeMode() {
+  const [question, setQuestion]             = useState<string | null>(null)
+  const [streamingText, setStreamingText]   = useState('')
+  const [showAnswer, setShowAnswer]         = useState(false)
+  const [loading, setLoading]               = useState(false)
+  const [error, setError]                   = useState('')
+  const [collections, setCollections]       = useState<Collection[]>([])
+  const [selectedCollections, setSelectedCollections] = useState<string[]>([])
+  const [topic, setTopic]                   = useState('')
+  const [customTopic, setCustomTopic]       = useState('')
+  const [showControls, setShowControls]     = useState(true)
+  const [followUpMessages, setFollowUpMessages] = useState<FollowUpMsg[]>([])
+  const [followUpInput, setFollowUpInput]   = useState('')
+  const [followUpLoading, setFollowUpLoading] = useState(false)
+  const questionRef      = useRef<HTMLDivElement>(null)
+  const followUpBottom   = useRef<HTMLDivElement>(null)
+  const fullStreamRef    = useRef('')   // accumulates every token; not bounded by the cut point
+
+  useEffect(() => {
+    fetchCollections()
+      .then((cols) => {
+        setCollections(cols)
+        setSelectedCollections(cols.map(c => c.name))
+      })
+      .catch(() => setCollections([]))
+  }, [])
+
+  useEffect(() => {
+    followUpBottom.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [followUpMessages])
+
+  function toggleCollection(name: string) {
+    setSelectedCollections(prev =>
+      prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]
+    )
+  }
+
+  const activeCols = selectedCollections.length > 0
+    ? selectedCollections
+    : collections.map(c => c.name)
+
+  async function handleGenerate() {
+    const effectiveTopic = customTopic.trim() || topic || 'any topic covered in the knowledge base'
+    setLoading(true)
+    setError('')
+    setQuestion(null)
+    setStreamingText('')
+    setShowAnswer(false)
+    setFollowUpMessages([])
+    setShowControls(false)
+    fullStreamRef.current = ''
+
+    await streamPracticeQuestion(
+      effectiveTopic,
+      activeCols,
+      (token) => {
+        fullStreamRef.current += token
+        // Stop updating the live preview once the answer section begins
+        const cutRe = /^[*\s]*Correct\s+Answer\b/im
+        if (!cutRe.test(fullStreamRef.current)) {
+          setStreamingText(prev => prev + token)
+        }
+      },
+      () => {
+        const final = fullStreamRef.current.trim()
+        if (!final) {
+          setError('The model returned an empty response. Try again.')
+        } else {
+          setQuestion(final)
+          setStreamingText('')
+          setTimeout(() => questionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
+        }
+        setLoading(false)
+      },
+      (err) => {
+        setError(err)
+        setStreamingText('')
+        setLoading(false)
+      },
+    )
+  }
+
+  async function handleFollowUp(e: FormEvent) {
+    e.preventDefault()
+    const userInput = followUpInput.trim()
+    if (!userInput || followUpLoading || !question) return
+
+    const userMsg: FollowUpMsg = { id: genFuId(), role: 'user', content: userInput }
+    const assistantId = genFuId()
+    const assistantMsg: FollowUpMsg = { id: assistantId, role: 'assistant', content: '' }
+
+    setFollowUpMessages(prev => [...prev, userMsg, assistantMsg])
+    setFollowUpInput('')
+    setFollowUpLoading(true)
+
+    await streamFollowUp(
+      question,
+      userInput,
+      (token) => setFollowUpMessages(prev =>
+        prev.map(m => m.id === assistantId ? { ...m, content: m.content + token } : m)
+      ),
+      () => setFollowUpLoading(false),
+      (err) => {
+        setFollowUpMessages(prev =>
+          prev.map(m => m.id === assistantId ? { ...m, content: `⚠️ ${err}` } : m)
+        )
+        setFollowUpLoading(false)
+      },
+    )
+  }
+
+  function splitQuestion(raw: string): { questionPart: string; answerPart: string } {
+    const normalised = raw.replace(/\n?^([A-E]\.)\s/gm, '\n\n$1 ')
+    // Match various formats the model may use, anchored to line-start to avoid false matches in option text
+    const splitRe = /^[*\s]*Correct\s+Answer\b|^[*\s]*Explanation\b\s*:/im
+    const m = splitRe.exec(normalised)
+    if (!m) return { questionPart: normalised, answerPart: '' }
+    return { questionPart: normalised.slice(0, m.index), answerPart: normalised.slice(m.index) }
+  }
+
+  const { questionPart, answerPart } = question
+    ? splitQuestion(question)
+    : { questionPart: '', answerPart: '' }
+
+  return (
+    <div className="space-y-5">
+
+      {/* ── Controls ── */}
+      {showControls ? (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
+          <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+            <BookOpen className="w-5 h-5 text-brand-600" />
+            Generate a Practice Question
+          </h2>
+
+          {/* Collection toggle pills */}
+          {collections.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Knowledge bases {collections.length > 1 && <span className="font-normal text-gray-400">(select one or more)</span>}
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {collections.map((c) => {
+                  const checked = selectedCollections.includes(c.name)
+                  return (
+                    <button
+                      key={c.name}
+                      type="button"
+                      onClick={() => toggleCollection(c.name)}
+                      className={`text-sm rounded-lg px-3 py-1.5 border transition-colors ${
+                        checked
+                          ? 'bg-brand-600 text-white border-brand-600'
+                          : 'bg-white text-gray-600 border-gray-300 hover:border-brand-400'
+                      }`}
+                    >
+                      {c.name}
+                      <span className={`ml-1.5 text-xs ${checked ? 'opacity-75' : 'text-gray-400'}`}>
+                        {c.document_count}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+              {selectedCollections.length === 0 && (
+                <p className="text-xs text-gray-400 mt-1">No selection — all collections will be used</p>
+              )}
+            </div>
+          )}
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Topic (optional)
+              </label>
+              <select
+                value={topic}
+                onChange={(e) => { setTopic(e.target.value); setCustomTopic('') }}
+                className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2
+                           focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                <option value="">Random topic</option>
+                {TOPIC_GROUPS.map((group) => (
+                  <optgroup key={group.label} label={group.label}>
+                    {group.topics.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Or type a specific topic
+              </label>
+              <input
+                type="text"
+                value={customTopic}
+                onChange={(e) => { setCustomTopic(e.target.value); setTopic('') }}
+                placeholder="e.g. Brachial plexus injuries"
+                className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2
+                           focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
+          </div>
+
+          <button
+            onClick={handleGenerate}
+            disabled={loading || collections.length === 0}
+            className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 disabled:bg-brand-300
+                       text-white font-medium rounded-lg px-5 py-2.5 transition-colors text-sm"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            {loading ? 'Generating…' : 'Generate Question'}
+          </button>
+
+          {collections.length === 0 && (
+            <p className="text-sm text-amber-600">
+              Upload study materials in the <strong>Knowledge Base</strong> tab first.
+            </p>
+          )}
+        </div>
+      ) : (
+        /* Compact bar */
+        <div className="flex items-center gap-3 bg-white rounded-xl border border-gray-200 shadow-sm px-4 py-3">
+          <button
+            onClick={handleGenerate}
+            disabled={loading}
+            className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 disabled:bg-brand-300
+                       text-white font-medium rounded-lg px-4 py-2 transition-colors text-sm"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            {loading ? 'Generating…' : 'New Question'}
+          </button>
+          <button
+            onClick={() => setShowControls(true)}
+            className="text-sm text-brand-600 hover:underline"
+          >
+            Change topic / collection
+          </button>
+        </div>
+      )}
+
+      {/* ── Error ── */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 text-sm">
+          {error}
+        </div>
+      )}
+
+      {/* ── Streaming live preview (tokens arriving) ── */}
+      {loading && streamingText && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 prose prose-sm max-w-none text-gray-900">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingText}</ReactMarkdown>
+          <span className="inline-block w-1.5 h-4 bg-brand-500 animate-pulse ml-0.5 align-middle" />
+        </div>
+      )}
+
+      {/* ── Waiting for first token ── */}
+      {loading && !streamingText && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-8 flex items-center justify-center gap-3 text-gray-400">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-sm">Generating question…</span>
+        </div>
+      )}
+
+      {/* ── Final question card ── */}
+      {question && !loading && (
+        <div ref={questionRef} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+
+          {/* Question + Options */}
+          <div className="p-5 prose prose-sm max-w-none text-gray-900">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {questionPart || question}
+            </ReactMarkdown>
+          </div>
+
+          {/* Reveal answer */}
+          <div className="border-t border-gray-100">
+            <button
+              onClick={() => setShowAnswer(v => !v)}
+              className="w-full flex items-center justify-between px-5 py-3 text-sm font-medium
+                         text-brand-700 hover:bg-brand-50 transition-colors"
+            >
+              {showAnswer ? 'Hide answer & explanation' : 'Reveal answer & explanation'}
+              {showAnswer ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+          </div>
+
+          {showAnswer && (
+            <div className="px-5 pb-5 pt-3 border-t border-brand-100 bg-brand-50 prose prose-sm max-w-none text-gray-900">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {answerPart || '*Answer is included in the question above.*'}
+              </ReactMarkdown>
+            </div>
+          )}
+
+          {/* ── Follow-up Q&A (always shown once question is loaded) ── */}
+          {(
+            <div className="border-t border-gray-200">
+              <div className="flex items-center gap-2 px-5 py-3 bg-gray-50 border-b border-gray-100">
+                <MessageSquare className="w-4 h-4 text-gray-400" />
+                <span className="text-sm font-medium text-gray-700">Ask a follow-up question</span>
+              </div>
+
+              {followUpMessages.length > 0 && (
+                <div className="px-5 py-3 space-y-3 max-h-96 overflow-y-auto">
+                  {followUpMessages.map((msg) => (
+                    <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
+                        msg.role === 'user'
+                          ? 'bg-brand-600 text-white'
+                          : 'bg-white border border-gray-200 text-gray-800'
+                      }`}>
+                        {msg.role === 'assistant' ? (
+                          <div className="prose prose-sm max-w-none">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                              {msg.content || '…'}
+                            </ReactMarkdown>
+                          </div>
+                        ) : msg.content}
+                      </div>
+                    </div>
+                  ))}
+                  <div ref={followUpBottom} />
+                </div>
+              )}
+
+              <form
+                onSubmit={handleFollowUp}
+                className="flex gap-2 items-center px-5 py-3 border-t border-gray-100"
+              >
+                <input
+                  type="text"
+                  value={followUpInput}
+                  onChange={(e) => setFollowUpInput(e.target.value)}
+                  placeholder="e.g. Why is option B wrong? Explain the anatomy in more detail."
+                  disabled={followUpLoading}
+                  className="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-2
+                             focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-50"
+                />
+                <button
+                  type="submit"
+                  disabled={followUpLoading || !followUpInput.trim()}
+                  className="bg-brand-600 hover:bg-brand-700 disabled:bg-brand-300
+                             text-white rounded-lg p-2 transition-colors flex-shrink-0"
+                >
+                  {followUpLoading
+                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                    : <Send className="w-4 h-4" />
+                  }
+                </button>
+              </form>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+

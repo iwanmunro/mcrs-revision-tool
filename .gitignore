@@ -1,0 +1,25 @@
+# Environment
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# ChromaDB (local vector store — large, machine-specific)
+backend/chroma_db/
+
+# Knowledge base uploads (may contain sensitive documents)
+backend/knowledge_base/
+
+# Node / frontend
+frontend/node_modules/
+frontend/dist/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log

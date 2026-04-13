@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply text-gray-900 antialiased;
+  }
+}
+
+/* Prose tweaks for ReactMarkdown inside chat bubbles */
+.prose p:last-child {
+  @apply mb-0;
+}

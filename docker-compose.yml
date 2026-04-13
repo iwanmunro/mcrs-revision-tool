@@ -1,0 +1,48 @@
+services:
+  # ── Ollama (local LLM runtime) ──────────────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: mrcs_ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - '11434:11434'
+    restart: unless-stopped
+
+  # ── FastAPI backend ──────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mrcs_backend
+    env_file: .env
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+    volumes:
+      - chroma_data:/app/chroma_db
+      - kb_uploads:/app/knowledge_base
+    depends_on:
+      - ollama
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # ── React frontend (nginx) ───────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: mrcs_frontend
+    ports:
+      - '${APP_PORT:-3000}:80'
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
+  chroma_data:
+  kb_uploads:
