@@ -250,7 +250,7 @@ export default function PracticeMode() {
     setPreloadedQueue([])
     setPreloadingCount(0)
     setQuestionIndex(1)
-    setSetTotal(queueCount)
+    setSetTotal(1)  // updated to actual count once questions are confirmed available
   }
 
   async function handleGenerate() {
@@ -288,14 +288,18 @@ export default function PracticeMode() {
           const remaining = queueCount - 1
           if (remaining > 0) {
             setPreloadingCount(remaining)
+            setSetTotal(1)  // start at 1 (Q1 confirmed); grows as each background Q succeeds
             for (let i = 0; i < remaining; i++) {
               generatePracticeQuestion(effectiveTopic, activeCols)
                 .then(q => {
                   setPreloadedQueue(prev => [...prev, q])
+                  setSetTotal(prev => prev + 1)  // only count successes
                   setPreloadingCount(prev => Math.max(0, prev - 1))
                 })
                 .catch(() => setPreloadingCount(prev => Math.max(0, prev - 1)))
             }
+          } else {
+            setSetTotal(1)
           }
         }
         setLoading(false)
@@ -322,6 +326,7 @@ export default function PracticeMode() {
       const texts = await fetchBankQuestions(queueCount)
       setQuestion(texts[0])
       setPreloadedQueue(texts.slice(1))
+      setSetTotal(texts.length)  // use actual count returned, not optimistic queueCount
       setTimeout(() => questionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
     } catch (e: unknown) {
       setError((e instanceof Error ? e.message : null) || 'Failed to load question')
