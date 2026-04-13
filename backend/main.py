@@ -27,6 +27,13 @@ from pydantic import BaseModel
 from auth import authenticate, require_auth
 from config import get_settings
 from ingest import LOADERS, ingest_file
+from question_bank import (
+    format_as_markdown,
+    init_db,
+    parse_and_store,
+    question_count,
+    random_question,
+)
 from rag import (
     answer_question,
     collection_document_count,
@@ -67,6 +74,9 @@ app.add_middleware(
 
 # Ensure knowledge base upload directory exists
 os.makedirs(settings.KNOWLEDGE_BASE_DIR, exist_ok=True)
+
+# Ensure question bank DB is initialised on startup
+init_db()
 
 # ---------------------------------------------------------------------------
 # Auth
@@ -294,6 +304,42 @@ def remove_collection(collection_name: str, _: str = Depends(require_auth)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return {"message": f"Collection '{collection_name}' deleted."}
+
+
+# ---------------------------------------------------------------------------
+# Question bank
+# ---------------------------------------------------------------------------
+
+
+class ParseBankRequest(BaseModel):
+    text: str
+    source: str = "question_bank"
+
+
+@app.post("/questions/bank/parse")
+def parse_bank(body: ParseBankRequest, _: str = Depends(require_auth)):
+    """Parse raw question bank text and store all found questions in SQLite."""
+    try:
+        stored = parse_and_store(body.text, source=body.source)
+    except Exception as e:
+        logger.error("Error parsing question bank: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"stored": stored, "total": question_count()}
+
+
+@app.get("/questions/bank/count")
+def bank_count(_: str = Depends(require_auth)):
+    """Return how many questions are in the bank."""
+    return {"count": question_count()}
+
+
+@app.get("/questions/bank/random")
+def bank_random(_: str = Depends(require_auth)):
+    """Return a random question from the bank as markdown."""
+    row = random_question()
+    if row is None:
+        raise HTTPException(status_code=404, detail="No questions in bank. Upload and parse the question bank file first.")
+    return {"question_text": format_as_markdown(row), "id": row["id"]}
 
 
 # ---------------------------------------------------------------------------

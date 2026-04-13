@@ -290,3 +290,41 @@ export async function deleteCollection(name: string): Promise<void> {
   })
   if (!res.ok) throw new Error('Failed to delete collection')
 }
+
+// ---------------------------------------------------------------------------
+// Question bank
+// ---------------------------------------------------------------------------
+
+export async function fetchBankQuestion(): Promise<string> {
+  const res = await apiFetch(`${BASE_URL}/questions/bank/random`, {
+    headers: authHeaders(),
+  })
+  if (!res.ok) {
+    if (res.status === 404) throw new Error('No questions in bank')
+    throw new Error('Failed to fetch question')
+  }
+  const data = await res.json()
+  return data.question_text as string
+}
+
+export async function fetchBankCount(): Promise<number> {
+  const res = await apiFetch(`${BASE_URL}/questions/bank/count`, {
+    headers: authHeaders(),
+  })
+  if (!res.ok) throw new Error('Failed to fetch question bank count')
+  const data = await res.json()
+  return data.count as number
+}
+
+export async function parseBankText(text: string): Promise<{ stored: number; total: number }> {
+  const res = await apiFetch(`${BASE_URL}/questions/bank/parse`, {
+    method: 'POST',
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.detail || 'Parse failed')
+  }
+  return res.json()
+}

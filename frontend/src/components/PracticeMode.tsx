@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, FormEvent } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { RefreshCw, ChevronDown, ChevronUp, Loader2, BookOpen, Send, MessageSquare } from 'lucide-react'
-import { streamPracticeQuestion, streamFollowUp, fetchCollections } from '../services/api'
+import { streamPracticeQuestion, streamFollowUp, fetchCollections, fetchBankQuestion } from '../services/api'
 import type { Collection } from '../types'
 
 let fuCounter = 0
@@ -177,6 +177,7 @@ export default function PracticeMode() {
   const [topic, setTopic]                   = useState('')
   const [customTopic, setCustomTopic]       = useState('')
   const [showControls, setShowControls]     = useState(true)
+  const [questionMode, setQuestionMode]     = useState<'generated' | 'bank'>('generated')
   const [followUpMessages, setFollowUpMessages] = useState<FollowUpMsg[]>([])
   const [followUpInput, setFollowUpInput]   = useState('')
   const [followUpLoading, setFollowUpLoading] = useState(false)
@@ -248,6 +249,26 @@ export default function PracticeMode() {
     )
   }
 
+  async function handleBankQuestion() {
+    setLoading(true)
+    setError('')
+    setQuestion(null)
+    setStreamingText('')
+    setShowAnswer(false)
+    setFollowUpMessages([])
+    setShowControls(false)
+    fullStreamRef.current = ''
+    try {
+      const text = await fetchBankQuestion()
+      setQuestion(text)
+      setTimeout(() => questionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
+    } catch (e: unknown) {
+      setError((e instanceof Error ? e.message : null) || 'Failed to load question')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function handleFollowUp(e: FormEvent) {
     e.preventDefault()
     const userInput = followUpInput.trim()
@@ -290,11 +311,59 @@ export default function PracticeMode() {
     ? splitQuestion(question)
     : { questionPart: '', answerPart: '' }
 
+  function switchMode(mode: 'generated' | 'bank') {
+    setQuestionMode(mode)
+    setShowControls(true)
+    setQuestion(null)
+    setStreamingText('')
+    setError('')
+    setFollowUpMessages([])
+    setShowAnswer(false)
+  }
+
   return (
     <div className="space-y-5">
 
+      {/* ── Mode toggle ── */}
+      <div className="flex gap-2">
+        {(['generated', 'bank'] as const).map((mode) => (
+          <button
+            key={mode}
+            type="button"
+            onClick={() => switchMode(mode)}
+            className={`text-sm rounded-lg px-4 py-2 border font-medium transition-colors ${
+              questionMode === mode
+                ? 'bg-brand-600 text-white border-brand-600'
+                : 'bg-white text-gray-600 border-gray-300 hover:border-brand-400'
+            }`}
+          >
+            {mode === 'generated' ? 'AI Generated' : 'Question Bank'}
+          </button>
+        ))}
+      </div>
+
       {/* ── Controls ── */}
-      {showControls ? (
+      {showControls ? (questionMode === 'bank' ? (
+        /* Bank mode controls */
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
+          <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+            <BookOpen className="w-5 h-5 text-brand-600" />
+            Practice from Question Bank
+          </h2>
+          <p className="text-sm text-gray-500">
+            Draw a random SBA question from the parsed question bank.
+          </p>
+          <button
+            onClick={handleBankQuestion}
+            disabled={loading}
+            className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 disabled:bg-brand-300
+                       text-white font-medium rounded-lg px-5 py-2.5 transition-colors text-sm"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            {loading ? 'Loading…' : 'Draw Question'}
+          </button>
+        </div>
+      ) : (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
           <h2 className="font-semibold text-gray-900 flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-brand-600" />
@@ -387,24 +456,26 @@ export default function PracticeMode() {
             </p>
           )}
         </div>
-      ) : (
+      )) : (
         /* Compact bar */
         <div className="flex items-center gap-3 bg-white rounded-xl border border-gray-200 shadow-sm px-4 py-3">
           <button
-            onClick={handleGenerate}
+            onClick={questionMode === 'bank' ? handleBankQuestion : handleGenerate}
             disabled={loading}
             className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 disabled:bg-brand-300
                        text-white font-medium rounded-lg px-4 py-2 transition-colors text-sm"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-            {loading ? 'Generating…' : 'New Question'}
+            {loading ? (questionMode === 'bank' ? 'Loading…' : 'Generating…') : 'New Question'}
           </button>
-          <button
-            onClick={() => setShowControls(true)}
-            className="text-sm text-brand-600 hover:underline"
-          >
-            Change topic / collection
-          </button>
+          {questionMode === 'generated' && (
+            <button
+              onClick={() => setShowControls(true)}
+              className="text-sm text-brand-600 hover:underline"
+            >
+              Change topic / collection
+            </button>
+          )}
         </div>
       )}
 
