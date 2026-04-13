@@ -23,10 +23,18 @@ sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plu
 sudo usermod -aG docker "$USER"
 echo "==> Docker installed"
 
-echo "==> Opening port 80 in UFW (Oracle Cloud also requires a Security List rule)"
-sudo ufw allow 80/tcp
-sudo ufw allow 22/tcp
-sudo ufw --force enable
+echo "==> Configuring firewall"
+if command -v ufw &>/dev/null; then
+  sudo ufw allow 80/tcp
+  sudo ufw allow 22/tcp
+  sudo ufw --force enable
+else
+  sudo apt-get install -y ufw
+  sudo ufw allow 80/tcp
+  sudo ufw allow 22/tcp
+  sudo ufw --force enable
+fi
+echo "NOTE: Also add an Ingress Rule for TCP port 80 in your Oracle Cloud Security List"
 
 echo "==> Cloning repository"
 git clone https://github.com/iwanmunro/mcrs-revision-tool.git app
