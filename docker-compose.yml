@@ -24,6 +24,7 @@ services:
     volumes:
       - chroma_data:/app/chroma_db
       - kb_uploads:/app/knowledge_base
+      - question_bank_data:/app/question_bank
     depends_on:
       - ollama
     restart: unless-stopped
@@ -52,3 +53,4 @@ volumes:
   ollama_data:
   chroma_data:
   kb_uploads:
+  question_bank_data:

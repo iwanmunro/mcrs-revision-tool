@@ -13,7 +13,7 @@ import sqlite3
 from pathlib import Path
 from typing import Optional
 
-DB_PATH = "./question_bank.db"
+DB_PATH = "/app/question_bank/question_bank.db"
 
 # ---------------------------------------------------------------------------
 # Database helpers
@@ -26,6 +26,7 @@ def get_db() -> sqlite3.Connection:
 
 
 def init_db() -> None:
+    Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
     conn = get_db()
     conn.execute("""
         CREATE TABLE IF NOT EXISTS questions (
