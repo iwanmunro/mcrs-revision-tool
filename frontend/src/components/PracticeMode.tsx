@@ -417,7 +417,8 @@ export default function PracticeMode() {
   }
 
   function parseCorrectAnswer(answerPart: string): string | null {
-    const m = /Correct\s+Answer\s*[:\-]?\s*\*{0,2}([A-E])\b/i.exec(answerPart)
+    // Handles formats like: "**Correct Answer:** B", "Correct Answer: B", "Correct Answer: **B**"
+    const m = /Correct\s+Answer[^ABCDE\n]*([ABCDE])\b/i.exec(answerPart)
     return m ? m[1].toUpperCase() : null
   }
 
