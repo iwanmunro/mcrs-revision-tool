@@ -191,6 +191,8 @@ function resolveTopic(t: string, custom: string): string {
   return t || 'any topic covered in the knowledge base'
 }
 
+const BUFFER_SIZE = 5  // max questions to keep pre-generated ahead of the user
+
 export default function PracticeMode() {
   const [question, setQuestion]             = useState<string | null>(null)
   const [streamingText, setStreamingText]   = useState('')
@@ -217,6 +219,12 @@ export default function PracticeMode() {
   const followUpBottom = useRef<HTMLDivElement>(null)
   const fullStreamRef  = useRef('')   // accumulates every token; not bounded by the cut point
   const wantingNext    = useRef(false) // set true when user clicks Next but queue is empty
+  // Sliding buffer refs — readable from async callbacks without stale closures
+  const remainingRef   = useRef(0)        // questions not yet started generating
+  const bufferRef      = useRef(0)        // mirrors preloadedQueue.length
+  const generatingRef  = useRef(false)    // is one generation currently in-flight
+  const activeTopicRef = useRef('')       // topic locked in for this session
+  const activeColsRef  = useRef<string[]>([]) // collections locked in
 
   useEffect(() => {
     fetchCollections()
@@ -251,6 +259,7 @@ export default function PracticeMode() {
     : collections.map(c => c.name)
 
   function advanceToNextQueued() {
+    bufferRef.current = Math.max(0, bufferRef.current - 1)
     setPreloadedQueue(prev => {
       const [next, ...rest] = prev
       setQuestion(next)
@@ -261,6 +270,8 @@ export default function PracticeMode() {
       setTimeout(() => questionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
       return rest
     })
+    // Buffer just shrank — try to fill it back up
+    fillBuffer()
   }
 
   function handleNext() {
@@ -277,7 +288,37 @@ export default function PracticeMode() {
     setPreloadedQueue([])
     setPreloadingCount(0)
     setQuestionIndex(1)
-    setSetTotal(1)  // updated to actual count once questions are confirmed available
+    setSetTotal(1)
+    remainingRef.current  = 0
+    bufferRef.current     = 0
+    generatingRef.current = false
+  }
+
+  // Sliding buffer: generate one question, push it, then immediately try to fill again.
+  // Stops when the buffer is full (BUFFER_SIZE ready) or nothing left to generate.
+  function fillBuffer() {
+    if (generatingRef.current) return       // already one in-flight
+    if (remainingRef.current <= 0) return   // all generated
+    if (bufferRef.current >= BUFFER_SIZE) return  // buffer full — user must advance first
+    generatingRef.current = true
+    remainingRef.current -= 1
+    ;(async () => {
+      let q: string | null = null
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          q = await generatePracticeQuestion(activeTopicRef.current, activeColsRef.current)
+          break
+        } catch { /* retry */ }
+      }
+      generatingRef.current = false
+      if (q) {
+        bufferRef.current += 1
+        setPreloadedQueue(prev => [...prev, q!])
+        setSetTotal(prev => prev + 1)
+      }
+      setPreloadingCount(remainingRef.current + (generatingRef.current ? 1 : 0))
+      fillBuffer()  // immediately try to start the next one
+    })()
   }
 
   async function handleGenerate() {
@@ -312,30 +353,17 @@ export default function PracticeMode() {
           setQuestion(final)
           setStreamingText('')
           setTimeout(() => questionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
-          // Pre-generate remaining questions serially in the background.
-          // Serial is faster than parallel on CPU: each request gets all threads
-          // instead of sharing them, so Q2 arrives ~4x sooner than with parallel.
+          // Kick off the sliding buffer: fill up to BUFFER_SIZE questions ahead,
+          // topping up each time the user advances to the next question.
           const remaining = queueCount - 1
           if (remaining > 0) {
+            activeTopicRef.current = effectiveTopic
+            activeColsRef.current  = activeCols
+            remainingRef.current   = remaining
+            bufferRef.current      = 0
             setPreloadingCount(remaining)
             setSetTotal(1)
-            ;(async () => {
-              for (let i = 0; i < remaining; i++) {
-                let q: string | null = null
-                // retry once — a transient Ollama queue error shouldn't end the loop
-                for (let attempt = 0; attempt < 2; attempt++) {
-                  try {
-                    q = await generatePracticeQuestion(effectiveTopic, activeCols)
-                    break
-                  } catch { /* retry or give up */ }
-                }
-                if (q) {
-                  setPreloadedQueue(prev => [...prev, q!])
-                  setSetTotal(prev => prev + 1)
-                }
-                setPreloadingCount(prev => Math.max(0, prev - 1))
-              }
-            })()
+            fillBuffer()
           } else {
             setSetTotal(1)
           }
@@ -495,7 +523,7 @@ export default function PracticeMode() {
                   className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 transition-colors text-lg leading-none"
                 >−</button>
                 <span className="px-3 py-1.5 text-sm font-semibold text-gray-900 min-w-[2rem] text-center">{queueCount}</span>
-                <button type="button" onClick={() => setQueueCount(v => Math.min(10, v + 1))}
+              <button type="button" onClick={() => setQueueCount(v => Math.min(180, v + 1))}
                   className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 transition-colors text-lg leading-none"
                 >+</button>
               </div>
@@ -528,7 +556,7 @@ export default function PracticeMode() {
                   className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 transition-colors text-lg leading-none"
                 >−</button>
                 <span className="px-3 py-1.5 text-sm font-semibold text-gray-900 min-w-[2rem] text-center">{queueCount}</span>
-                <button type="button" onClick={() => setQueueCount(v => Math.min(10, v + 1))}
+              <button type="button" onClick={() => setQueueCount(v => Math.min(180, v + 1))}
                   className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 transition-colors text-lg leading-none"
                 >+</button>
               </div>

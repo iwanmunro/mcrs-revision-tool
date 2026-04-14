@@ -64,8 +64,8 @@ def random_question() -> Optional[dict]:
 
 
 def random_questions(n: int) -> list[dict]:
-    """Return up to *n* distinct random questions (capped at 50)."""
-    n = max(1, min(n, 50))
+    """Return up to *n* distinct random questions (capped at 180)."""
+    n = max(1, min(n, 180))
     conn = get_db()
     rows = conn.execute(
         "SELECT * FROM questions WHERE option_a IS NOT NULL AND option_e IS NOT NULL "
