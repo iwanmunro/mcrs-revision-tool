@@ -14,9 +14,10 @@ interface FollowUpMsg {
   content: string
 }
 
-const TOPIC_GROUPS: { label: string; topics: string[] }[] = [
+const TOPIC_GROUPS: { label: string; paper: 1 | 2; topics: string[] }[] = [
   {
     label: 'Paper 1 – Anatomy (Regional)',
+    paper: 1,
     topics: [
       'Thoracic anatomy',
       'Abdominal anatomy and retroperitoneum',
@@ -32,6 +33,7 @@ const TOPIC_GROUPS: { label: string; topics: string[] }[] = [
   },
   {
     label: 'Paper 1 – Anatomy (Embryology & Imaging)',
+    paper: 1,
     topics: [
       'Surgical embryology – thorax',
       'Surgical embryology – head and neck (branchial arches)',
@@ -42,6 +44,7 @@ const TOPIC_GROUPS: { label: string; topics: string[] }[] = [
   },
   {
     label: 'Paper 1 – Physiology (General)',
+    paper: 1,
     topics: [
       'Fluid compartments and Starling forces',
       'Acid-base balance and blood gas interpretation',
@@ -54,6 +57,7 @@ const TOPIC_GROUPS: { label: string; topics: string[] }[] = [
   },
   {
     label: 'Paper 1 – Physiology (Organ Systems)',
+    paper: 1,
     topics: [
       'Cardiovascular physiology and cardiac cycle',
       'Respiratory physiology and lung volumes',
@@ -65,6 +69,7 @@ const TOPIC_GROUPS: { label: string; topics: string[] }[] = [
   },
   {
     label: 'Paper 1 – Pathology',
+    paper: 1,
     topics: [
       'Acute and chronic inflammation',
       'Wound healing and repair',
@@ -82,6 +87,7 @@ const TOPIC_GROUPS: { label: string; topics: string[] }[] = [
   },
   {
     label: 'Paper 1 – Pharmacology, Microbiology & Imaging',
+    paper: 1,
     topics: [
       'Analgesics and opioid pharmacology',
       'Antibiotic classes and surgical prophylaxis',
@@ -97,6 +103,7 @@ const TOPIC_GROUPS: { label: string; topics: string[] }[] = [
   },
   {
     label: 'Paper 2 – Common Surgical Conditions',
+    paper: 2,
     topics: [
       'Colorectal cancer and IBD',
       'Appendicitis and biliary disease',
@@ -121,6 +128,7 @@ const TOPIC_GROUPS: { label: string; topics: string[] }[] = [
   },
   {
     label: 'Paper 2 – Perioperative Management',
+    paper: 2,
     topics: [
       'Preoperative assessment and ASA classification',
       'DVT/PE prophylaxis and VTE risk',
@@ -137,6 +145,7 @@ const TOPIC_GROUPS: { label: string; topics: string[] }[] = [
   },
   {
     label: 'Paper 2 – Trauma',
+    paper: 2,
     topics: [
       'ATLS primary and secondary survey',
       'Haemorrhagic shock classification',
@@ -153,6 +162,7 @@ const TOPIC_GROUPS: { label: string; topics: string[] }[] = [
   },
   {
     label: 'Paper 2 – Paediatric Surgery & Medico-legal',
+    paper: 2,
     topics: [
       'Neonatal surgical emergencies',
       'Paediatric trauma and non-accidental injury',
@@ -166,7 +176,20 @@ const TOPIC_GROUPS: { label: string; topics: string[] }[] = [
   },
 ]
 
-export default function PracticeMode() {
+// Flat topic lists per paper for random paper-level selection
+const PAPER_TOPICS: Record<'__paper1__' | '__paper2__', string[]> = {
+  __paper1__: TOPIC_GROUPS.filter(g => g.paper === 1).flatMap(g => g.topics),
+  __paper2__: TOPIC_GROUPS.filter(g => g.paper === 2).flatMap(g => g.topics),
+}
+
+function resolveTopic(t: string, custom: string): string {
+  if (custom.trim()) return custom.trim()
+  if (t === '__paper1__' || t === '__paper2__') {
+    const pool = PAPER_TOPICS[t]
+    return pool[Math.floor(Math.random() * pool.length)]
+  }
+  return t || 'any topic covered in the knowledge base'
+}
   const [question, setQuestion]             = useState<string | null>(null)
   const [streamingText, setStreamingText]   = useState('')
   const [showAnswer, setShowAnswer]         = useState(false)
@@ -254,7 +277,7 @@ export default function PracticeMode() {
   }
 
   async function handleGenerate() {
-    const effectiveTopic = customTopic.trim() || topic || 'any topic covered in the knowledge base'
+    const effectiveTopic = resolveTopic(topic, customTopic)
     setLoading(true)
     setError('')
     setQuestion(null)
@@ -526,6 +549,8 @@ export default function PracticeMode() {
                            focus:outline-none focus:ring-2 focus:ring-brand-500"
               >
                 <option value="">Random topic</option>
+                <option value="__paper1__">— Paper 1 (any topic) —</option>
+                <option value="__paper2__">— Paper 2 (any topic) —</option>
                 {TOPIC_GROUPS.map((group) => (
                   <optgroup key={group.label} label={group.label}>
                     {group.topics.map((t) => (
