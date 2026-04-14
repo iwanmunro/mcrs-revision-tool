@@ -517,16 +517,18 @@ export default function PracticeMode() {
           {/* Questions per set */}
           <div className="space-y-1">
             <div className="flex items-center gap-3">
-              <label className="text-sm font-medium text-gray-700">Questions per set</label>
-              <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
-                <button type="button" onClick={() => setQueueCount(v => Math.max(1, v - 1))}
-                  className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 transition-colors text-lg leading-none"
-                >−</button>
-                <span className="px-3 py-1.5 text-sm font-semibold text-gray-900 min-w-[2rem] text-center">{queueCount}</span>
-              <button type="button" onClick={() => setQueueCount(v => Math.min(180, v + 1))}
-                  className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 transition-colors text-lg leading-none"
-                >+</button>
-              </div>
+              <label htmlFor="bank-qcount" className="text-sm font-medium text-gray-700">Questions per set</label>
+              <input
+                id="bank-qcount"
+                type="number"
+                min={1}
+                max={180}
+                value={queueCount}
+                onChange={e => setQueueCount(Math.min(180, Math.max(1, Number(e.target.value) || 1)))}
+                onBlur={e => setQueueCount(Math.min(180, Math.max(1, Number(e.target.value) || 1)))}
+                className="w-20 text-sm font-semibold text-center border border-gray-300 rounded-lg px-3 py-1.5
+                           focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
             </div>
             <p className="text-xs text-gray-400">Questions are drawn instantly</p>
           </div>
@@ -550,16 +552,18 @@ export default function PracticeMode() {
           {/* Questions per set */}
           <div className="space-y-1">
             <div className="flex items-center gap-3">
-              <label className="text-sm font-medium text-gray-700">Questions per set</label>
-              <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
-                <button type="button" onClick={() => setQueueCount(v => Math.max(1, v - 1))}
-                  className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 transition-colors text-lg leading-none"
-                >−</button>
-                <span className="px-3 py-1.5 text-sm font-semibold text-gray-900 min-w-[2rem] text-center">{queueCount}</span>
-              <button type="button" onClick={() => setQueueCount(v => Math.min(180, v + 1))}
-                  className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 transition-colors text-lg leading-none"
-                >+</button>
-              </div>
+              <label htmlFor="ai-qcount" className="text-sm font-medium text-gray-700">Questions per set</label>
+              <input
+                id="ai-qcount"
+                type="number"
+                min={1}
+                max={180}
+                value={queueCount}
+                onChange={e => setQueueCount(Math.min(180, Math.max(1, Number(e.target.value) || 1)))}
+                onBlur={e => setQueueCount(Math.min(180, Math.max(1, Number(e.target.value) || 1)))}
+                className="w-20 text-sm font-semibold text-center border border-gray-300 rounded-lg px-3 py-1.5
+                           focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
             </div>
             <p className="text-xs text-gray-400">Rest generate silently in background</p>
           </div>
