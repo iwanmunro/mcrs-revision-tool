@@ -7,7 +7,7 @@ services:
       OLLAMA_NUM_THREAD: '8'          # use all vCPUs
       OLLAMA_FLASH_ATTENTION: '1'     # faster attention
       OLLAMA_MAX_LOADED_MODELS: '2'   # keep both models warm
-      OLLAMA_NUM_PARALLEL: '1'        # serial requests = each gets all threads = faster per-request
+      OLLAMA_NUM_PARALLEL: '2'        # 2 slots: one for background generation, one for interactive requests
     volumes:
       - ollama_data:/root/.ollama
     # Port not exposed publicly — backend accesses via internal Docker network

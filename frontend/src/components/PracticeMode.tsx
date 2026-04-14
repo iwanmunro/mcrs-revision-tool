@@ -293,11 +293,18 @@ export default function PracticeMode() {
             setSetTotal(1)
             ;(async () => {
               for (let i = 0; i < remaining; i++) {
-                try {
-                  const q = await generatePracticeQuestion(effectiveTopic, activeCols)
-                  setPreloadedQueue(prev => [...prev, q])
+                let q: string | null = null
+                // retry once — a transient Ollama queue error shouldn't end the loop
+                for (let attempt = 0; attempt < 2; attempt++) {
+                  try {
+                    q = await generatePracticeQuestion(effectiveTopic, activeCols)
+                    break
+                  } catch { /* retry or give up */ }
+                }
+                if (q) {
+                  setPreloadedQueue(prev => [...prev, q!])
                   setSetTotal(prev => prev + 1)
-                } catch { /* silent — counter just won't reach queueCount */ }
+                }
                 setPreloadingCount(prev => Math.max(0, prev - 1))
               }
             })()
