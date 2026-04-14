@@ -284,20 +284,23 @@ export default function PracticeMode() {
           setQuestion(final)
           setStreamingText('')
           setTimeout(() => questionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
-          // Pre-generate remaining questions silently in the background
+          // Pre-generate remaining questions serially in the background.
+          // Serial is faster than parallel on CPU: each request gets all threads
+          // instead of sharing them, so Q2 arrives ~4x sooner than with parallel.
           const remaining = queueCount - 1
           if (remaining > 0) {
             setPreloadingCount(remaining)
-            setSetTotal(1)  // start at 1 (Q1 confirmed); grows as each background Q succeeds
-            for (let i = 0; i < remaining; i++) {
-              generatePracticeQuestion(effectiveTopic, activeCols)
-                .then(q => {
+            setSetTotal(1)
+            ;(async () => {
+              for (let i = 0; i < remaining; i++) {
+                try {
+                  const q = await generatePracticeQuestion(effectiveTopic, activeCols)
                   setPreloadedQueue(prev => [...prev, q])
-                  setSetTotal(prev => prev + 1)  // only count successes
-                  setPreloadingCount(prev => Math.max(0, prev - 1))
-                })
-                .catch(() => setPreloadingCount(prev => Math.max(0, prev - 1)))
-            }
+                  setSetTotal(prev => prev + 1)
+                } catch { /* silent — counter just won't reach queueCount */ }
+                setPreloadingCount(prev => Math.max(0, prev - 1))
+              }
+            })()
           } else {
             setSetTotal(1)
           }
