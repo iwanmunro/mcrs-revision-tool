@@ -190,6 +190,8 @@ function resolveTopic(t: string, custom: string): string {
   }
   return t || 'any topic covered in the knowledge base'
 }
+
+export default function PracticeMode() {
   const [question, setQuestion]             = useState<string | null>(null)
   const [streamingText, setStreamingText]   = useState('')
   const [showAnswer, setShowAnswer]         = useState(false)
