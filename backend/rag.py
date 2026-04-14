@@ -123,23 +123,19 @@ Context:
 
 QA_HUMAN_PROMPT = "{question}"
 
-PRACTICE_SYSTEM_PROMPT = """Write one MRCS Part A Single Best Answer question on the topic given by the user. Base it on the context below.
+PRACTICE_SYSTEM_PROMPT = """Write one MRCS Part A Single Best Answer question on the topic given by the user. Use the context below.
 
-Use this exact format:
-
+Format (follow exactly):
 **Question:**
-[clinical scenario ending in a question]
-
+[clinical scenario + question]
 A. [option]
 B. [option]
 C. [option]
 D. [option]
 E. [option]
-
 **Correct Answer:** [letter]
-
 **Explanation:**
-[2-3 sentences explaining the correct answer and why the others are wrong]
+[2-3 sentences: why correct answer is right and key distractors are wrong]
 
 Context:
 {context}"""
@@ -161,13 +157,14 @@ def _format_docs(docs: list) -> str:
     return "\n\n---\n\n".join(doc.page_content for doc in docs)
 
 
-def _retrieve_from_collections(collection_names: list[str], query: str) -> list:
+def _retrieve_from_collections(collection_names: list[str], query: str, top_k: int | None = None) -> list:
     """Retrieve and merge chunks from multiple collections, deduplicating by content."""
+    k = top_k if top_k is not None else settings.RETRIEVAL_TOP_K
     all_docs: list = []
     for name in collection_names:
         try:
             vs = get_vector_store(name)
-            docs = vs.similarity_search(query, k=settings.RETRIEVAL_TOP_K)
+            docs = vs.similarity_search(query, k=k)
             all_docs.extend(docs)
         except Exception:
             continue
@@ -178,7 +175,7 @@ def _retrieve_from_collections(collection_names: list[str], query: str) -> list:
         if h not in seen:
             seen.add(h)
             unique.append(doc)
-    return unique[:settings.RETRIEVAL_TOP_K]
+    return unique[:k]
 
 
 def answer_question(
@@ -242,7 +239,7 @@ def generate_practice_question(
     import random
 
     names = collection_names or [collection_name]
-    results = _retrieve_from_collections(names, topic)
+    results = _retrieve_from_collections(names, topic, top_k=settings.PRACTICE_RETRIEVAL_TOP_K)
     if not results:
         return (
             "No documents found in the knowledge base. "
@@ -272,7 +269,7 @@ async def stream_practice_question(
     import random
 
     names = collection_names or [collection_name]
-    results = _retrieve_from_collections(names, topic)
+    results = _retrieve_from_collections(names, topic, top_k=settings.PRACTICE_RETRIEVAL_TOP_K)
     if not results:
         yield (
             "No documents found in the knowledge base. "

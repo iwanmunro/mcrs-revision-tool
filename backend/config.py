@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     # RAG settings
     # Fewer chunks = less prefill tokens = faster generation
     RETRIEVAL_TOP_K: int = 2
+    # Practice questions only need one paragraph of context
+    PRACTICE_RETRIEVAL_TOP_K: int = 1
     CHUNK_SIZE: int = 400
     CHUNK_OVERLAP: int = 60
 
