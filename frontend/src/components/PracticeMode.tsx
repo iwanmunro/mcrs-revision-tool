@@ -518,18 +518,20 @@ export default function PracticeMode() {
           </h2>
 
           {/* Questions per set */}
-          <div className="flex items-center gap-3">
-            <label className="text-sm font-medium text-gray-700">Questions per set</label>
-            <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
-              <button type="button" onClick={() => setQueueCount(v => Math.max(1, v - 1))}
-                className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 transition-colors text-lg leading-none"
-              >−</button>
-              <span className="px-3 py-1.5 text-sm font-semibold text-gray-900 min-w-[2rem] text-center">{queueCount}</span>
-              <button type="button" onClick={() => setQueueCount(v => Math.min(10, v + 1))}
-                className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 transition-colors text-lg leading-none"
-              >+</button>
+          <div className="space-y-1">
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-medium text-gray-700">Questions per set</label>
+              <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
+                <button type="button" onClick={() => setQueueCount(v => Math.max(1, v - 1))}
+                  className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 transition-colors text-lg leading-none"
+                >−</button>
+                <span className="px-3 py-1.5 text-sm font-semibold text-gray-900 min-w-[2rem] text-center">{queueCount}</span>
+                <button type="button" onClick={() => setQueueCount(v => Math.min(10, v + 1))}
+                  className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 transition-colors text-lg leading-none"
+                >+</button>
+              </div>
             </div>
-            <span className="text-xs text-gray-400">Rest generate silently in background</span>
+            <p className="text-xs text-gray-400">Rest generate silently in background</p>
           </div>
 
           {/* Collection toggle pills */}
