@@ -91,13 +91,13 @@ def get_llm() -> ChatOllama:
 
 
 def get_practice_llm() -> ChatOllama:
-    """Model for practice question generation — smaller ctx + capped output for speed."""
+    """Model for practice question generation — capped output for speed."""
     return ChatOllama(
         model="llama3.1:8b",
         base_url=settings.OLLAMA_BASE_URL,
         temperature=0.5,
-        num_ctx=1024,     # practice prompt + RAG context fits comfortably; smaller = faster KV cache
-        num_predict=400,  # SBA question + explanation is ~250 tokens; cap prevents runaway output
+        num_ctx=2048,     # safe headroom: prompt+context ~600 tokens, leaves ~1400 for output
+        num_predict=450,  # SBA question + explanation is ~300 tokens; cap prevents runaway output
         top_k=20,         # tighter sampling = fewer logit evaluations per token
     )
 

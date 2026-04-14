@@ -138,18 +138,28 @@ export async function streamQuestion(
 // Practice
 // ---------------------------------------------------------------------------
 
+/**
+ * Generate a practice question by draining the SSE stream into a string.
+ * Using the stream endpoint (rather than the non-streaming REST endpoint) keeps
+ * the connection alive with data flowing, avoiding Cloudflare's 100s origin timeout.
+ */
 export async function generatePracticeQuestion(
   topic: string,
   collections: string[],
 ): Promise<string> {
-  const res = await apiFetch(`${BASE_URL}/practice/generate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({ topic, collections }),
+  return new Promise((resolve, reject) => {
+    let accumulated = ''
+    streamPracticeQuestion(
+      topic,
+      collections,
+      (token) => { accumulated += token },
+      () => {
+        if (accumulated.trim()) resolve(accumulated.trim())
+        else reject(new Error('Empty response'))
+      },
+      (err) => reject(new Error(err)),
+    )
   })
-  if (!res.ok) throw new Error('Failed to generate question')
-  const data = await res.json()
-  return data.question_text as string
 }
 
 /**
