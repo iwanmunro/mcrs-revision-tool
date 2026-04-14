@@ -4,7 +4,7 @@ services:
     image: ollama/ollama:latest
     container_name: mrcs_ollama
     environment:
-      OLLAMA_NUM_THREAD: '8'          # use all vCPUs
+      OLLAMA_NUM_THREAD: '16'         # use all vCPUs
       OLLAMA_FLASH_ATTENTION: '1'     # faster attention
       OLLAMA_MAX_LOADED_MODELS: '2'   # keep both models warm
       OLLAMA_NUM_PARALLEL: '2'        # 2 slots: one for background generation, one for interactive requests
