@@ -43,15 +43,15 @@ async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
 // Auth
 // ---------------------------------------------------------------------------
 
-export async function login(password: string): Promise<string> {
+export async function login(username: string, password: string): Promise<string> {
   const res = await fetch(`${BASE_URL}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ password }),
+    body: JSON.stringify({ username, password }),
   })
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
-    throw new Error(data.detail || 'Incorrect password')
+    throw new Error(data.detail || 'Incorrect username or password')
   }
   const data = await res.json()
   return data.access_token as string

@@ -8,6 +8,7 @@ interface Props {
 }
 
 export default function PasswordGate({ onSuccess, expiredMessage }: Props) {
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -17,7 +18,7 @@ export default function PasswordGate({ onSuccess, expiredMessage }: Props) {
     setError('')
     setLoading(true)
     try {
-      const token = await login(password)
+      const token = await login(username, password)
       setToken(token)
       onSuccess()
     } catch (err: unknown) {
@@ -37,7 +38,7 @@ export default function PasswordGate({ onSuccess, expiredMessage }: Props) {
           </div>
           <h1 className="text-2xl font-bold text-gray-900">MRCS Revision Assistant</h1>
           <p className="text-gray-500 text-sm mt-1 text-center">
-            Powered by a local AI — enter your access password to continue
+            Powered by a local AI — sign in to continue
           </p>
         </div>
 
@@ -52,10 +53,30 @@ export default function PasswordGate({ onSuccess, expiredMessage }: Props) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label
+              htmlFor="username"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Username
+            </label>
+            <input
+              id="username"
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Enter username"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-gray-900
+                         focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+              required
+              autoFocus
+              autoComplete="username"
+            />
+          </div>
+          <div>
+            <label
               htmlFor="password"
               className="block text-sm font-medium text-gray-700 mb-1"
             >
-              Access Password
+              Password
             </label>
             <input
               id="password"
@@ -66,7 +87,7 @@ export default function PasswordGate({ onSuccess, expiredMessage }: Props) {
               className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-gray-900
                          focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
               required
-              autoFocus
+              autoComplete="current-password"
             />
           </div>
 
@@ -78,7 +99,7 @@ export default function PasswordGate({ onSuccess, expiredMessage }: Props) {
 
           <button
             type="submit"
-            disabled={loading || !password}
+            disabled={loading || !username || !password}
             className="w-full bg-brand-600 hover:bg-brand-700 disabled:bg-brand-300
                        text-white font-semibold rounded-lg px-4 py-2.5 transition-colors"
           >

@@ -85,6 +85,7 @@ init_db()
 
 
 class LoginRequest(BaseModel):
+    username: str
     password: str
 
 
@@ -95,11 +96,11 @@ class TokenResponse(BaseModel):
 
 @app.post("/auth/login", response_model=TokenResponse)
 def login(body: LoginRequest):
-    token = authenticate(body.password)
+    token = authenticate(body.username, body.password)
     if token is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect password",
+            detail="Incorrect username or password",
         )
     return TokenResponse(access_token=token)
 

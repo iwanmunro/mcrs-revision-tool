@@ -33,14 +33,14 @@ BANK_FILE = os.getenv(
 
 # ---------------------------------------------------------------------------
 
-def login(password: str) -> str:
+def login(username: str, password: str) -> str:
     r = requests.post(
         f"{API_BASE}/auth/login",
-        json={"password": password},
+        json={"username": username, "password": password},
         timeout=15,
     )
     if r.status_code == 401:
-        sys.exit("Wrong password.")
+        sys.exit("Wrong username or password.")
     r.raise_for_status()
     return r.json()["access_token"]
 
@@ -57,9 +57,10 @@ def main() -> None:
     text = bank_path.read_text(encoding="utf-8", errors="replace")
     print(f"  {len(text):,} characters, {text.count(chr(10)):,} lines")
 
-    password = os.getenv("MRCS_PASSWORD") or getpass.getpass("Site password: ")
+    username = os.getenv("MRCS_USERNAME") or input("Username: ")
+    password = os.getenv("MRCS_PASSWORD") or getpass.getpass("Password: ")
     print("Logging in …")
-    token = login(password)
+    token = login(username, password)
     print("  OK")
 
     headers = {

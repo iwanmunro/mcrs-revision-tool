@@ -16,8 +16,8 @@ class Settings(BaseSettings):
     KNOWLEDGE_BASE_DIR: str = "./knowledge_base"
 
     # Authentication
-    # Single shared password for all users
-    APP_PASSWORD: str = "changeme"
+    # JSON object mapping username -> password, e.g. '{"alice": "pass1", "bob": "pass2"}'
+    USERS: str = '{"admin": "changeme"}'
     SECRET_KEY: str = "change-this-to-a-long-random-secret-key"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480  # 8 hours
 

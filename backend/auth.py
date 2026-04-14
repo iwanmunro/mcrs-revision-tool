@@ -1,4 +1,5 @@
 import hmac
+import json
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -24,11 +25,18 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
 
 
-def authenticate(password: str) -> Optional[str]:
-    """Verify the shared app password using a constant-time comparison."""
-    if not hmac.compare_digest(password, settings.APP_PASSWORD):
+def authenticate(username: str, password: str) -> Optional[str]:
+    """Verify username + password against the USERS config dict."""
+    try:
+        users: dict = json.loads(settings.USERS)
+    except Exception:
         return None
-    return create_access_token({"sub": "user"})
+    stored = users.get(username)
+    if stored is None:
+        return None
+    if not hmac.compare_digest(password, stored):
+        return None
+    return create_access_token({"sub": username})
 
 
 def require_auth(
