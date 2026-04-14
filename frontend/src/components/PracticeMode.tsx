@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, FormEvent } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { RefreshCw, ChevronDown, ChevronUp, Loader2, BookOpen, Send, MessageSquare } from 'lucide-react'
+import { RefreshCw, ChevronDown, ChevronUp, Loader2, BookOpen, Send, MessageSquare, Check, X } from 'lucide-react'
 import { streamPracticeQuestion, generatePracticeQuestion, streamFollowUp, fetchCollections, fetchBankQuestions } from '../services/api'
 import type { Collection } from '../types'
 
@@ -195,6 +195,7 @@ export default function PracticeMode() {
   const [question, setQuestion]             = useState<string | null>(null)
   const [streamingText, setStreamingText]   = useState('')
   const [showAnswer, setShowAnswer]         = useState(false)
+  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null)
   const [loading, setLoading]               = useState(false)
   const [error, setError]                   = useState('')
   const [collections, setCollections]       = useState<Collection[]>([])
@@ -254,6 +255,7 @@ export default function PracticeMode() {
       const [next, ...rest] = prev
       setQuestion(next)
       setShowAnswer(false)
+      setSelectedAnswer(null)
       setFollowUpMessages([])
       setQuestionIndex(i => i + 1)
       setTimeout(() => questionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
@@ -285,6 +287,7 @@ export default function PracticeMode() {
     setQuestion(null)
     setStreamingText('')
     setShowAnswer(false)
+    setSelectedAnswer(null)
     setFollowUpMessages([])
     setShowControls(false)
     fullStreamRef.current = ''
@@ -353,6 +356,7 @@ export default function PracticeMode() {
     setQuestion(null)
     setStreamingText('')
     setShowAnswer(false)
+    setSelectedAnswer(null)
     setFollowUpMessages([])
     setShowControls(false)
     fullStreamRef.current = ''
@@ -399,6 +403,24 @@ export default function PracticeMode() {
     )
   }
 
+  function parseOptions(text: string): { stem: string; options: { letter: string; text: string }[] } {
+    const optionRe = /^([A-E])\. +(.+)/gm
+    const options: { letter: string; text: string }[] = []
+    let firstIndex = Infinity
+    let m
+    while ((m = optionRe.exec(text)) !== null) {
+      if (m.index < firstIndex) firstIndex = m.index
+      options.push({ letter: m[1], text: m[2].trim() })
+    }
+    const stem = firstIndex < Infinity ? text.slice(0, firstIndex).trim() : text.trim()
+    return { stem, options }
+  }
+
+  function parseCorrectAnswer(answerPart: string): string | null {
+    const m = /Correct\s+Answer\s*[:\-]?\s*\*{0,2}([A-E])\b/i.exec(answerPart)
+    return m ? m[1].toUpperCase() : null
+  }
+
   function splitQuestion(raw: string): { questionPart: string; answerPart: string } {
     const normalised = raw.replace(/\n?^([A-E]\.)\s/gm, '\n\n$1 ')
     // Match various formats the model may use, anchored to line-start to avoid false matches in option text
@@ -412,6 +434,9 @@ export default function PracticeMode() {
     ? splitQuestion(question)
     : { questionPart: '', answerPart: '' }
 
+  const parsed       = question ? parseOptions(questionPart || question) : null
+  const correctAnswer = question ? parseCorrectAnswer(answerPart) : null
+
   function switchMode(mode: 'generated' | 'bank') {
     setQuestionMode(mode)
     setShowControls(true)
@@ -420,6 +445,7 @@ export default function PracticeMode() {
     setError('')
     setFollowUpMessages([])
     setShowAnswer(false)
+    setSelectedAnswer(null)
     setPreloadedQueue([])
     setPreloadingCount(0)
     setQuestionIndex(1)
@@ -676,12 +702,49 @@ export default function PracticeMode() {
 
           <div ref={questionRef} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
 
-          {/* Question + Options */}
+          {/* Question stem */}
           <div className="p-5 prose prose-sm max-w-none text-gray-900">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {questionPart || question}
+              {parsed?.stem || questionPart || question}
             </ReactMarkdown>
           </div>
+
+          {/* Selectable answer options */}
+          {parsed && parsed.options.length > 0 && (
+            <div className="px-5 pb-5 space-y-2">
+              {parsed.options.map(({ letter, text }) => {
+                const isSelected = selectedAnswer === letter
+                const isCorrect  = showAnswer && correctAnswer === letter
+                const isWrong    = showAnswer && isSelected && letter !== correctAnswer
+                const isDimmed   = showAnswer && !isCorrect && !isSelected
+                return (
+                  <button
+                    key={letter}
+                    type="button"
+                    onClick={() => !showAnswer && setSelectedAnswer(letter === selectedAnswer ? null : letter)}
+                    disabled={showAnswer}
+                    className={`w-full text-left flex items-center gap-3 rounded-lg px-4 py-3 border text-sm transition-colors
+                      ${
+                        isCorrect ? 'border-green-500 bg-green-50 text-green-800' :
+                        isWrong   ? 'border-red-400 bg-red-50 text-red-800' :
+                        isDimmed  ? 'border-gray-100 text-gray-300' :
+                        isSelected ? 'border-brand-500 bg-brand-50 text-brand-800' :
+                        'border-gray-200 hover:border-brand-400 hover:bg-gray-50 text-gray-800 cursor-pointer'
+                      }`}
+                  >
+                    <span className={`font-semibold w-6 shrink-0 ${
+                      isCorrect ? 'text-green-600' : isWrong ? 'text-red-500' : isDimmed ? 'text-gray-300' : 'text-gray-500'
+                    }`}>
+                      {letter}.
+                    </span>
+                    <span className="flex-1">{text}</span>
+                    {isCorrect && <Check className="w-4 h-4 text-green-600 shrink-0" />}
+                    {isWrong   && <X     className="w-4 h-4 text-red-500  shrink-0" />}
+                  </button>
+                )
+              })}
+            </div>
+          )}
 
           {/* Reveal answer */}
           <div className="border-t border-gray-100">
